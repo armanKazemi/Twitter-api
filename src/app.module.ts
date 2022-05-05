@@ -6,14 +6,16 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { FollowModule } from './follow/follow.module';
 import { LikeModule } from './like/like.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot(typeOrmConfig),
-    TweetModule,
-    UserModule,
     AuthModule,
+    UserModule,
     FollowModule,
+    TweetModule,
+    MediaModule,
     LikeModule,
   ],
 })

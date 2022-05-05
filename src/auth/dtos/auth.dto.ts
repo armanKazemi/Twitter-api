@@ -1,6 +1,8 @@
 import {
   IsDateString,
   IsEmail,
+  IsEnum,
+  IsOptional,
   IsPhoneNumber,
   IsString,
   Matches,
@@ -9,16 +11,26 @@ import {
 } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
 
-export class SignUpDto {
+export enum SignUpMethod {
+  phoneNumber = 'PHONE_NUMBER',
+  email = 'EMAIL',
+}
+
+export class AuthDto {
   @IsString()
   @Matches(/^(?=.{8,20}$)(?![_.])(?!.*[_.]{2})[a-zA-Z\d._]+(?<![_.])$/, {
     message: 'username is invalid',
   })
   username: string;
 
+  @IsEnum(SignUpMethod)
+  signUpMethod: SignUpMethod;
+
+  @IsOptional()
   @IsPhoneNumber()
   phoneNumber: string;
 
+  @IsOptional()
   @IsEmail()
   email: string;
 
