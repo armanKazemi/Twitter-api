@@ -12,6 +12,7 @@ import {
 import { getConnection, Repository } from 'typeorm';
 import { UserService } from '../user/user.service';
 import { Status as UserStatus, UserEntity } from '../user/entities/user.entity';
+import { TweetService } from '../tweet/tweet.service';
 
 export enum RelationStatus {
   followFollow = 'FOLLOW_FOLLOW',
@@ -34,6 +35,7 @@ export class FollowService {
     @InjectRepository(FollowEntity)
     private readonly followRepository: Repository<FollowEntity>,
     private readonly userService: UserService,
+    private readonly tweetService: TweetService,
   ) {}
 
   async getRelationStatus(
@@ -52,7 +54,6 @@ export class FollowService {
         userId: requestingUserId,
       },
     });
-
     // noneNone
     if (
       // Relation requesting user to target user: none
@@ -61,105 +62,108 @@ export class FollowService {
       !targetToRequesting
     ) {
       return RelationStatus.noneNone;
-    }
-    // noneFollow
-    else if (
-      // Relation requesting user to target user: none
-      !requestingToTarget &&
-      // Relation target user to requesting user: follow
-      targetToRequesting.status === Status.follower
-    ) {
-      return RelationStatus.noneFollow;
-    }
-    // followNone
-    else if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
-      // Relation target user to requesting user: none
-      !targetToRequesting
-    ) {
-      return RelationStatus.followNone;
-    }
-    // nonePending
-    else if (
-      // Relation requesting user to target user: none
-      !requestingToTarget &&
-      // Relation target user to requesting user: pending
-      targetToRequesting.status === Status.pending
-    ) {
-      return RelationStatus.nonePending;
-    }
-    // pendingNone
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: none
-      !targetToRequesting
-    ) {
-      return RelationStatus.pendingNone;
-    }
-    // blockNone
-    else if (
-      // Relation requesting user to target user: block
-      targetToRequesting.status === Status.block &&
-      // Relation target user to requesting user: none
-      !requestingToTarget
-    ) {
-      return RelationStatus.blockNone;
-    }
-    // noneBlock
-    else if (
-      // Relation requesting user to target user: none
-      !targetToRequesting &&
-      // Relation target user to requesting user: block
-      requestingToTarget.status === Status.block
-    ) {
-      return RelationStatus.noneBlock;
-    }
-    // followFollow
-    else if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
-      // Relation target user to requesting user: follower
-      targetToRequesting.status === Status.follower
-    ) {
-      return RelationStatus.followFollow;
-    }
-    // followPending
-    else if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
-      // Relation target user to requesting user: pending
-      targetToRequesting.status === Status.pending
-    ) {
-      return RelationStatus.followPending;
-    }
-    // pendingFollow
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: follow
-      targetToRequesting.status === Status.follower
-    ) {
-      return RelationStatus.pendingFollow;
-    }
-    // pendingPending
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: pending
-      targetToRequesting.status === Status.pending
-    ) {
-      return RelationStatus.pendingPending;
-    }
-    // blockBlock
-    else if (
-      // Relation requesting user to target user: block
-      targetToRequesting.status === Status.block &&
-      // Relation target user to requesting user: block
-      requestingToTarget.status === Status.block
-    ) {
-      return RelationStatus.blockBlock;
+    } else if (!requestingToTarget && targetToRequesting) {
+      // noneFollow
+      if (
+        // Relation requesting user to target user: none
+        !requestingToTarget &&
+        // Relation target user to requesting user: follow
+        targetToRequesting.status === Status.follower
+      ) {
+        return RelationStatus.noneFollow;
+      }
+      // nonePending
+      else if (
+        // Relation requesting user to target user: none
+        !requestingToTarget &&
+        // Relation target user to requesting user: pending
+        targetToRequesting.status === Status.pending
+      ) {
+        return RelationStatus.nonePending;
+      }
+      // blockNone
+      else if (
+        // Relation requesting user to target user: block
+        targetToRequesting.status === Status.block &&
+        // Relation target user to requesting user: none
+        !requestingToTarget
+      ) {
+        return RelationStatus.blockNone;
+      }
+    } else if (requestingToTarget && !targetToRequesting) {
+      // followNone
+      if (
+        // Relation requesting user to target user: follower
+        requestingToTarget.status === Status.follower &&
+        // Relation target user to requesting user: none
+        !targetToRequesting
+      ) {
+        return RelationStatus.followNone;
+      }
+      // pendingNone
+      else if (
+        // Relation requesting user to target user: pending
+        requestingToTarget.status === Status.pending &&
+        // Relation target user to requesting user: none
+        !targetToRequesting
+      ) {
+        return RelationStatus.pendingNone;
+      }
+      // noneBlock
+      else if (
+        // Relation requesting user to target user: none
+        !targetToRequesting &&
+        // Relation target user to requesting user: block
+        requestingToTarget.status === Status.block
+      ) {
+        return RelationStatus.noneBlock;
+      }
+    } else {
+      // followFollow
+      if (
+        // Relation requesting user to target user: follower
+        requestingToTarget.status === Status.follower &&
+        // Relation target user to requesting user: follower
+        targetToRequesting.status === Status.follower
+      ) {
+        return RelationStatus.followFollow;
+      }
+      // followPending
+      else if (
+        // Relation requesting user to target user: follower
+        requestingToTarget.status === Status.follower &&
+        // Relation target user to requesting user: pending
+        targetToRequesting.status === Status.pending
+      ) {
+        return RelationStatus.followPending;
+      }
+      // pendingFollow
+      else if (
+        // Relation requesting user to target user: pending
+        requestingToTarget.status === Status.pending &&
+        // Relation target user to requesting user: follow
+        targetToRequesting.status === Status.follower
+      ) {
+        return RelationStatus.pendingFollow;
+      }
+      // pendingPending
+      else if (
+        // Relation requesting user to target user: pending
+        requestingToTarget.status === Status.pending &&
+        // Relation target user to requesting user: pending
+        targetToRequesting.status === Status.pending
+      ) {
+        return RelationStatus.pendingPending;
+      }
+      // blockBlock
+      else if (
+        // Relation requesting user to target user: block
+        targetToRequesting.status === Status.block &&
+        // Relation target user to requesting user: block
+        requestingToTarget.status === Status.block
+      ) {
+        return RelationStatus.blockBlock;
+      }
     }
   }
 
@@ -169,42 +173,12 @@ export class FollowService {
     page: number,
   ): Promise<Array<UserEntity>> {
     // Check request user can see followers of target user or not
-    const acceptableTargetUser = await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT COUNT(*) FROM users
-                WHERE 
-                    users.id = ${targetUserId} AND
-                    (
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.user_id
-                            WHERE
-                              users.id = ${requestingUserId}
-                              OR
-                              users.status = '${UserStatus.private}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status = '${FollowStatus.follower}'
-                              OR
-                              users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                      OR
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.target_user_id
-                            WHERE
-                              users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                    )
-                `,
+    const acceptableTargetUser =
+      await this.tweetService.requestingUserIsAcceptableForTargetUser(
+        requestingUserId,
+        targetUserId,
       );
-    if (acceptableTargetUser.at(0).count == 0) {
+    if (!acceptableTargetUser) {
       throw new ForbiddenException(`You are not allowed.`);
     }
     return getConnection()
@@ -228,42 +202,12 @@ export class FollowService {
     page: number,
   ): Promise<Array<FollowEntity>> {
     // Check request user can see following of target user or not
-    const acceptableTargetUser = await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT COUNT(*) FROM users
-                WHERE 
-                    users.id = ${targetUserId} AND
-                    (
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.user_id
-                            WHERE
-                              users.id = ${requestingUserId}
-                              OR
-                              users.status = '${UserStatus.private}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status = '${FollowStatus.follower}'
-                              OR
-                              users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                      OR
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.target_user_id
-                            WHERE
-                              users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                    )
-                `,
+    const acceptableTargetUser =
+      await this.tweetService.requestingUserIsAcceptableForTargetUser(
+        requestingUserId,
+        targetUserId,
       );
-    if (acceptableTargetUser.at(0).count == 0) {
+    if (!acceptableTargetUser) {
       throw new ForbiddenException(`You are not allowed.`);
     }
     return getConnection()
@@ -274,7 +218,7 @@ export class FollowService {
                     users.id = follow.user_id 
                 WHERE 
                     follow.status = '${FollowStatus.follower}' AND 
-                    follow.target_user_id = ${targetUserId} 
+                    follow.target_user_id = ${targetUserId}
                 ORDER BY 
                     follow.created_at DESC 
                 OFFSET ${page * 10} ROWS FETCH NEXT 10 ROWS ONLY `,
@@ -319,7 +263,6 @@ export class FollowService {
     if (requestingUserId === targetUserId) {
       throw new BadRequestException(`You can't follow yourself.`);
     }
-    const requestingUser = await this.userService.getUserById(requestingUserId);
     const targetUser = await this.userService.getUserById(targetUserId);
     const notAllowed = await this.followRepository.find({
       where: [
@@ -355,9 +298,7 @@ export class FollowService {
     // Create new follow entity
     const follow = new FollowEntity();
     // Current user is 'follower' / 'pending user' of 'target user'
-    follow.user = targetUser;
     follow.userId = targetUserId;
-    follow.targetUser = requestingUser;
     follow.targetUserId = requestingUserId;
     if (targetUser.status === UserStatus.public) {
       follow.status = FollowStatus.follower;
@@ -372,76 +313,60 @@ export class FollowService {
     requestingUserId: number,
     targetUserId: number,
   ): Promise<void> {
-    const followRelation = await this.followRepository.findOne({
-      where: {
-        // Check the target user be following of user
-        status: FollowStatus.follower,
-        userId: targetUserId,
-        targetUserId: requestingUserId,
-      },
-    });
-
-    if (!followRelation) {
-      throw new BadRequestException('The target user is not your following.');
-    }
-    // Delete follow relation
-    await this.followRepository.remove(followRelation);
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `DELETE FROM follow
+                WHERE
+                    status = '${FollowStatus.follower}' AND
+                    user_id = ${targetUserId} AND
+                    target_user_id = ${requestingUserId}
+                `,
+      );
   }
 
   async unPending(
     requestingUserId: number,
     targetUserId: number,
   ): Promise<void> {
-    const pendingRelation = await this.followRepository.findOne({
-      where: {
-        // Check the target user be pending to user
-        status: FollowStatus.pending,
-        userId: targetUserId,
-        targetUserId: requestingUserId,
-      },
-    });
-
-    if (!pendingRelation) {
-      throw new BadRequestException('You are not pending to target user.');
-    }
-    // Delete pending relation
-    await this.followRepository.remove(pendingRelation);
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `DELETE FROM follow
+                WHERE
+                    status = '${FollowStatus.pending}' AND
+                    user_id = ${targetUserId} AND
+                    target_user_id = ${requestingUserId}
+                `,
+      );
   }
 
   async accept(requestingUserId: number, targetUserId: number): Promise<void> {
-    const pendingRelation = await this.followRepository.findOne({
-      where: {
-        // Check the 'target user' be 'pending user' of user
-        status: FollowStatus.pending,
-        userId: requestingUserId,
-        targetUserId: targetUserId,
-      },
-    });
-
-    if (!pendingRelation) {
-      throw new BadRequestException('The target user is not pending for you.');
-    }
-    // Change status
-    pendingRelation.status = FollowStatus.follower;
-    // Save relation
-    await this.followRepository.save(pendingRelation);
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `UPDATE follow
+                SET
+                    status = '${FollowStatus.follower}'
+                WHERE
+                    status = '${FollowStatus.pending}' AND
+                    user_id = ${requestingUserId} AND
+                    target_user_id = ${targetUserId}
+                `,
+      );
   }
 
   async refuse(requestingUserId: number, targetUserId: number): Promise<void> {
-    const pendingRelation = await this.followRepository.findOne({
-      where: {
-        // Check the 'target user' be 'pending user' of user
-        status: FollowStatus.pending,
-        userId: requestingUserId,
-        targetUserId: targetUserId,
-      },
-    });
-
-    if (!pendingRelation) {
-      throw new BadRequestException('The target user is not pending for you.');
-    }
-    // Delete relation
-    await this.followRepository.remove(pendingRelation);
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `DELETE FROM follow
+                WHERE
+                    status = '${FollowStatus.pending}' AND
+                    user_id = ${requestingUserId} AND
+                    target_user_id = ${targetUserId}
+                `,
+      );
   }
 
   async block(requestingUserId: number, targetUserId: number): Promise<void> {
@@ -449,8 +374,6 @@ export class FollowService {
     if (requestingUserId === targetUserId) {
       throw new BadRequestException(`You can't block yourself.`);
     }
-    const requestingUser = await this.userService.getUserById(requestingUserId);
-    const targetUser = await this.userService.getUserById(targetUserId);
     const notAllowed = await this.followRepository.find({
       where: [
         {
@@ -495,27 +418,22 @@ export class FollowService {
     // Create block relation
     const relation = new FollowEntity();
     relation.status = FollowStatus.block;
-    relation.user = requestingUser;
     relation.userId = requestingUserId;
-    relation.targetUser = targetUser;
     relation.targetUserId = targetUserId;
     // Save relation
     await this.followRepository.save(relation);
   }
 
   async unblock(requestingUserId: number, targetUserId: number): Promise<void> {
-    const blockRelation = await this.followRepository.findOne({
-      where: {
-        // Check the 'target user' be 'block user' for user
-        status: FollowStatus.block,
-        userId: requestingUserId,
-        targetUserId: targetUserId,
-      },
-    });
-    if (!blockRelation) {
-      throw new BadRequestException('The target user is not block.');
-    }
-    // Delete relation
-    await this.followRepository.remove(blockRelation);
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `DELETE FROM follow
+                WHERE
+                    status = '${FollowStatus.block}' AND
+                    user_id = ${requestingUserId} AND
+                    target_user_id = ${targetUserId}
+                `,
+      );
   }
 }

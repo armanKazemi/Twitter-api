@@ -3,11 +3,9 @@ import { MediaService } from './media.service';
 import { MediaController } from './media.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaEntity } from './entities/media.entity';
-import { UserModule } from '../user/user.module';
-import { TweetModule } from '../tweet/tweet.module';
 import { ConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
-import { FollowModule } from '../follow/follow.module';
+import { TweetModule } from '../tweet/tweet.module';
 
 @Module({
   imports: [
@@ -19,8 +17,6 @@ import { FollowModule } from '../follow/follow.module';
       }),
     }),
     TypeOrmModule.forFeature([MediaEntity]),
-    UserModule,
-    FollowModule,
     TweetModule,
   ],
   providers: [MediaService],

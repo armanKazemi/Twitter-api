@@ -49,27 +49,30 @@ export class UserService {
   }
 
   async publicToPrivate(userId: number): Promise<void> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    // Check user status be public
-    if (user.status === Status.public) {
-      // Change user status to private
-      user.status = Status.private;
-      // Save user
-      await this.userRepository.save(user);
-    }
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `UPDATE users
+                SET
+                    status = '${Status.private}'
+                WHERE
+                    id = ${userId} AND
+                    status = '${Status.public}'`,
+      );
   }
 
   async privateToPublic(userId: number): Promise<void> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    // Check user status be private
-    if (user.status === Status.private) {
-      // Change user status to public
-      user.status = Status.public;
-      // Save user
-      await this.userRepository.save(user);
-      // Convert all pending users of user to follower
-      await UserService.acceptAllPendingUsers(userId);
-    }
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `UPDATE users
+                SET
+                    status = '${Status.public}'
+                WHERE
+                    id = ${userId} AND
+                    status = '${Status.private}'`,
+      );
+    await UserService.acceptAllPendingUsers(userId);
   }
 
   async setLastSeenOfTimeline(userId: number, lastSeen: string): Promise<void> {
@@ -90,8 +93,8 @@ export class UserService {
     const dateAndTime = lastSeen.split(', ');
     const date = dateAndTime.at(0).split('/');
     const year = date.at(2);
-    const month = date.at(1).length === 1 ? `0${date.at(1)}` : date.at(1);
-    const day = date.at(0).length === 1 ? `0${date.at(0)}` : date.at(0);
+    const day = date.at(1).length === 1 ? `0${date.at(1)}` : date.at(1);
+    const month = date.at(0).length === 1 ? `0${date.at(0)}` : date.at(0);
     const time = dateAndTime.at(1).split(':');
     const hour = time.at(0).length === 1 ? `0${time.at(0)}` : time.at(0);
     const minute = time.at(1).length === 1 ? `0${time.at(1)}` : time.at(1);
@@ -103,48 +106,14 @@ export class UserService {
       .manager.query(
         `SELECT COUNT(*) FROM tweets
                 WHERE
-                tweets.created_at < '${lastTime}' AND
-                (
-                  tweets.id IN (
-                        SELECT tweets.id FROM tweets
-                        WHERE
-                            (
-                              tweets.user_id IN (
-                                    SELECT users.id FROM users
-                                    LEFT JOIN follow ON
-                                      users.id = follow.user_id
-                                    WHERE
-                                      users.id = ${requestingUserId}
-                                      OR
-                                      users.status = '${UserStatus.private}' AND
-                                      follow.target_user_id = ${requestingUserId} AND
-                                      follow.status = '${FollowStatus.follower}'
-                                      OR
-                                      users.status = '${UserStatus.public}' AND
-                                      follow.target_user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
-                                )
-                              OR
-                              tweets.user_id IN (
-                                    SELECT users.id FROM users
-                                    LEFT JOIN follow ON
-                                      users.id = follow.target_user_id
-                                    WHERE
-                                      users.status = '${UserStatus.public}' AND
-                                      follow.user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
-                                )
-                            )
-                            AND
-                            (
-                              tweets.tweet_type = '${TweetType.normal}'
-                              OR
-                              tweets.tweet_type <> '${TweetType.normal}' AND
+                  tweets.created_at < '${lastTime}' AND
+                  (
+                    tweets.id IN (
+                          SELECT tweets.id FROM tweets
+                          WHERE
                               (
-                                tweets.reference_tweet_id IN (
-                                      SELECT tweets.id FROM tweets
-                                      LEFT JOIN users ON
-                                        tweets.user_id = users.id
+                                tweets.user_id IN (
+                                      SELECT users.id FROM users
                                       LEFT JOIN follow ON
                                         users.id = follow.user_id
                                       WHERE
@@ -155,54 +124,119 @@ export class UserService {
                                         follow.status = '${FollowStatus.follower}'
                                         OR
                                         users.status = '${UserStatus.public}' AND
-                                        follow.target_user_id = ${requestingUserId} AND
-                                        follow.status <> '${FollowStatus.block}'
+                                        (
+                                          follow.target_user_id = ${requestingUserId} AND
+                                          follow.status <> '${FollowStatus.block}'
+                                          OR
+                                          follow.target_user_id <> ${requestingUserId}
+                                        )
                                   )
                                 OR
-                                tweets.reference_tweet_id IN (
-                                    SELECT tweets.id FROM tweets
-                                    LEFT JOIN users ON
-                                      tweets.user_id = users.id
-                                    LEFT JOIN follow ON
-                                      users.id = follow.target_user_id
-                                    WHERE
-                                      users.status = '${UserStatus.public}' AND
-                                      follow.user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
+                                tweets.user_id IN (
+                                      SELECT users.id FROM users
+                                      LEFT JOIN follow ON
+                                        users.id = follow.target_user_id
+                                      WHERE
+                                        users.status = '${UserStatus.public}' AND
+                                        (
+                                          follow.user_id = ${requestingUserId} AND
+                                          follow.status <> '${FollowStatus.block}'
+                                          OR
+                                          follow.user_id <> ${requestingUserId}
+                                        )
                                   )
                               )
-                            )
-                    )
-                  OR
-                  tweets.id IN (SELECT tweet_id FROM likes
-                            LEFT JOIN users ON
-                                likes.user_id = users.id
-                            LEFT JOIN follow ON
-                                users.id = follow.user_id
-                            WHERE
-                                users.status = '${UserStatus.private}' AND
-                                follow.status = '${FollowStatus.follower}' AND
-                                follow.target_user_id = ${requestingUserId}
-                            OR
-                                users.status = '${UserStatus.public}' AND
-                                follow.status <> '${FollowStatus.block}' AND
-                                (
-                                    follow.target_user_id = ${requestingUserId}
+                              AND
+                              (
+                                tweets.tweet_type = '${TweetType.normal}'
                                 OR
-                                    follow.user_id = ${requestingUserId}
+                                tweets.tweet_type <> '${TweetType.normal}' AND
+                                (
+                                  tweets.reference_tweet_id IN (
+                                        SELECT tweets.id FROM tweets
+                                        LEFT JOIN users ON
+                                          tweets.user_id = users.id
+                                        LEFT JOIN follow ON
+                                          users.id = follow.user_id
+                                        WHERE
+                                          users.id = ${requestingUserId}
+                                          OR
+                                          users.status = '${UserStatus.private}' AND
+                                          follow.target_user_id = ${requestingUserId} AND
+                                          follow.status = '${FollowStatus.follower}'
+                                          OR
+                                          users.status = '${UserStatus.public}' AND
+                                          (
+                                            follow.target_user_id = ${requestingUserId} AND
+                                            follow.status <> '${FollowStatus.block}'
+                                            OR
+                                            follow.target_user_id <> ${requestingUserId}
+                                          )
+                                    )
+                                  OR
+                                  tweets.reference_tweet_id IN (
+                                      SELECT tweets.id FROM tweets
+                                      LEFT JOIN users ON
+                                        tweets.user_id = users.id
+                                      LEFT JOIN follow ON
+                                        users.id = follow.target_user_id
+                                      WHERE
+                                        users.status = '${UserStatus.public}' AND
+                                        (
+                                          follow.user_id = ${requestingUserId} AND
+                                          follow.status <> '${FollowStatus.block}'
+                                          OR
+                                          follow.user_id <> ${requestingUserId}
+                                        )
+                                    )
                                 )
-                        )
-                )
+                              )
+                      )
+                  OR
+                    tweets.id IN (SELECT tweet_id FROM likes
+                              LEFT JOIN users ON
+                                  likes.user_id = users.id
+                              LEFT JOIN follow ON
+                                  users.id = follow.user_id
+                              WHERE
+                                  users.status = '${UserStatus.private}' AND
+                                  follow.status = '${FollowStatus.follower}' AND
+                                  follow.target_user_id = ${requestingUserId}
+                              OR
+                                  users.status = '${UserStatus.public}' AND
+                                  (
+                                    follow.status <> '${FollowStatus.block}' AND
+                                    (
+                                      follow.target_user_id = ${requestingUserId}
+                                      OR
+                                      follow.user_id = ${requestingUserId}
+                                    )
+                                    OR
+                                    (
+                                      follow.target_user_id <> ${requestingUserId}
+                                      OR
+                                      follow.user_id <> ${requestingUserId}
+                                    )
+                                  )
+                          )
+                  )
+                GROUP BY
+                    tweets.id
                 `,
       );
-    return Math.floor(numOfTweetsBeforeLastSeenDate.at(0).count / 10);
+    return Math.floor(numOfTweetsBeforeLastSeenDate.length / 10);
   }
 
   private static async acceptAllPendingUsers(userId: number): Promise<void> {
     await getConnection()
       .createQueryRunner()
       .manager.query(
-        `UPDATE follow SET status = '${FollowStatus.follower}' WHERE user_id = ${userId} AND status = '${FollowStatus.pending}'`,
+        `UPDATE follow 
+                SET 
+                    status = '${FollowStatus.follower}' 
+                WHERE 
+                    user_id = ${userId} AND 
+                    status = '${FollowStatus.pending}'`,
       );
   }
 }

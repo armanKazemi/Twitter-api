@@ -71,7 +71,7 @@ export class AuthService {
         where: [{ username: username }, { phoneNumber: phoneNumber }],
       });
       if (alreadyExistPhoneNumber) {
-        throw new ConflictException('PhoneNumber already exist.');
+        throw new ConflictException('Username or PhoneNumber already exist.');
       }
     } else if (signUpMethod === SignUpMethod.email) {
       // Check duplication of username/email
@@ -80,7 +80,7 @@ export class AuthService {
       });
 
       if (alreadyExistEmail) {
-        throw new ConflictException('Email already exist.');
+        throw new ConflictException('Username or Email already exist.');
       }
     }
 

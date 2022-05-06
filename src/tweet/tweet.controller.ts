@@ -78,13 +78,19 @@ export class TweetController {
   }
 
   // RETWEETS
+  @UseGuards(JwtAuthGuard)
   @Get(':tweetId/retweets')
   @ApiOperation({ summary: 'Get users who retweet the tweet. (by tweet id)' })
   getTweetRetweets(
     @Query('page') page = '0',
     @Param('tweetId', ParseIntPipe) tweetId: number,
+    @GetCurrentUser() requestingUser: UserEntity,
   ): Promise<Array<UserEntity>> {
-    return this.tweetService.getTweetRetweets(tweetId, +page);
+    return this.tweetService.getTweetRetweets(
+      requestingUser.id,
+      tweetId,
+      +page,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -206,7 +212,7 @@ export class TweetController {
   getUserRelationWithTweet(
     @Param('tweetId', ParseIntPipe) tweetId: number,
     @GetCurrentUser() requestingUser: UserEntity,
-  ): Promise<string> {
+  ): Promise<Array<string>> {
     return this.tweetService.getUserRelationWithTweet(
       requestingUser.id,
       tweetId,

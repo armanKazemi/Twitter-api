@@ -24,7 +24,7 @@ export class LikeController {
   @Get('/:likeId')
   @ApiOperation({ summary: 'Get like by id' })
   getLikeById(
-    @Param('tweetId', ParseIntPipe) likeId: number,
+    @Param('likeId', ParseIntPipe) likeId: number,
   ): Promise<LikeEntity> {
     return this.likeService.getLikeById(likeId);
   }
@@ -41,7 +41,7 @@ export class LikeController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('/:targetTweetId/TweetsLikesCount')
+  @Get('/:targetTweetId/tweetLikesCount')
   @ApiOperation({
     summary: 'Get count of users that have liked the tweet. (by id)',
   })

@@ -17,7 +17,7 @@ import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GetCurrentUser } from '../user/decorator/getCurrentUser.decorator';
 import { UserEntity } from '../user/entities/user.entity';
-import { createReadStream, unlink } from 'fs';
+import { createReadStream } from 'fs';
 import { join } from 'path';
 import { Express } from 'express';
 import { MediaEntity, MediaPosition } from './entities/media.entity';
@@ -144,12 +144,12 @@ export class MediaController {
   @Get('/:mediaId/download')
   @ApiOperation({ summary: 'Download media.' })
   async downloadMedia(
-    @GetCurrentUser() requestedUser: UserEntity,
+    @GetCurrentUser() requestingUser: UserEntity,
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Response({ passthrough: true }) response,
   ): Promise<StreamableFile> {
     const mediaMetadata = await this.mediaService.getMediaMetadata(
-      requestedUser.id,
+      requestingUser.id,
       mediaId,
     );
     const stream = createReadStream(join(process.cwd(), mediaMetadata.path));
@@ -164,18 +164,9 @@ export class MediaController {
   @Delete('/:mediaId/delete')
   @ApiOperation({ summary: 'Delete media. (Just for avatar or profileImg)' })
   async deleteMedia(
-    @GetCurrentUser() requestedUser: UserEntity,
+    @GetCurrentUser() requestingUser: UserEntity,
     @Param('mediaId', ParseIntPipe) mediaId: number,
   ): Promise<void> {
-    const mediaMetaData = await this.mediaService.deleteMediaMetadata(
-      requestedUser.id,
-      mediaId,
-    );
-    unlink(mediaMetaData.path, (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
-    return;
+    await this.mediaService.deleteMedia(requestingUser.id, mediaId);
   }
 }

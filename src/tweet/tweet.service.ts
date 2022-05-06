@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TweetEntity, TweetType } from './entities/tweet.entity';
 import { getConnection, Repository } from 'typeorm';
@@ -18,16 +14,6 @@ export class TweetService {
     private readonly tweetRepository: Repository<TweetEntity>,
     private readonly userService: UserService,
   ) {}
-  async getTweet(tweetId: number): Promise<TweetEntity> {
-    const tweet = this.tweetRepository
-      .createQueryBuilder('tweets')
-      .where({ id: tweetId })
-      .getOne();
-    if (!tweet) {
-      throw new NotFoundException('There is no such user');
-    }
-    return tweet;
-  }
 
   async getTweetById(
     requestingUserId: number,
@@ -57,8 +43,12 @@ export class TweetService {
                               follow.status = '${FollowStatus.follower}'
                               OR
                               users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
                         )
                       OR
                       tweets.user_id IN (
@@ -67,8 +57,12 @@ export class TweetService {
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                         )
                     )
                     AND
@@ -91,8 +85,12 @@ export class TweetService {
                                 follow.status = '${FollowStatus.follower}'
                                 OR
                                 users.status = '${UserStatus.public}' AND
-                                follow.target_user_id = ${requestingUserId} AND
-                                follow.status <> '${FollowStatus.block}'
+                                (
+                                  follow.target_user_id = ${requestingUserId} AND
+                                  follow.status <> '${FollowStatus.block}'
+                                  OR
+                                  follow.target_user_id <> ${requestingUserId}
+                                )
                           )
                         OR
                         tweets.reference_tweet_id IN (
@@ -103,8 +101,12 @@ export class TweetService {
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                           )
                       )
                     )
@@ -148,8 +150,12 @@ export class TweetService {
                                       follow.status = '${FollowStatus.follower}'
                                       OR
                                       users.status = '${UserStatus.public}' AND
-                                      follow.target_user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
+                                      (
+                                        follow.target_user_id = ${requestingUserId} AND
+                                        follow.status <> '${FollowStatus.block}'
+                                        OR
+                                        follow.target_user_id <> ${requestingUserId}
+                                      )
                                 )
                               OR
                               tweets.user_id IN (
@@ -158,8 +164,12 @@ export class TweetService {
                                       users.id = follow.target_user_id
                                     WHERE
                                       users.status = '${UserStatus.public}' AND
-                                      follow.user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
+                                      (
+                                        follow.user_id = ${requestingUserId} AND
+                                        follow.status <> '${FollowStatus.block}'
+                                        OR
+                                        follow.user_id <> ${requestingUserId}
+                                      )
                                 )
                             )
                             AND
@@ -188,8 +198,14 @@ export class TweetService {
                                         users.status = '${
                                           UserStatus.public
                                         }' AND
-                                        follow.target_user_id = ${requestingUserId} AND
-                                        follow.status <> '${FollowStatus.block}'
+                                        (
+                                          follow.target_user_id = ${requestingUserId} AND
+                                          follow.status <> '${
+                                            FollowStatus.block
+                                          }'
+                                          OR
+                                          follow.target_user_id <> ${requestingUserId}
+                                        )
                                   )
                                 OR
                                 tweets.reference_tweet_id IN (
@@ -200,8 +216,12 @@ export class TweetService {
                                       users.id = follow.target_user_id
                                     WHERE
                                       users.status = '${UserStatus.public}' AND
-                                      follow.user_id = ${requestingUserId} AND
-                                      follow.status <> '${FollowStatus.block}'
+                                      (
+                                        follow.user_id = ${requestingUserId} AND
+                                        follow.status <> '${FollowStatus.block}'
+                                        OR
+                                        follow.user_id <> ${requestingUserId}
+                                      )
                                   )
                               )
                             )
@@ -218,33 +238,55 @@ export class TweetService {
                                 follow.target_user_id = ${requestingUserId}
                             OR
                                 users.status = '${UserStatus.public}' AND
-                                follow.status <> '${FollowStatus.block}' AND
                                 (
+                                  follow.status <> '${FollowStatus.block}' AND
+                                  (
                                     follow.target_user_id = ${requestingUserId}
-                                OR
+                                    OR
                                     follow.user_id = ${requestingUserId}
+                                  )
+                                  OR
+                                  (
+                                    follow.target_user_id <> ${requestingUserId}
+                                    OR
+                                    follow.user_id <> ${requestingUserId}
+                                  )
                                 )
                         )
+                GROUP BY
+                    tweets.id
                 ORDER BY 
-                    tweets.created_at DESC
+                    tweets.created_at ASC
                 OFFSET ${page * 10} ROWS FETCH NEXT 10 ROWS ONLY
                 `,
       );
     // Save date of last tweet that user saw in his timeline
     const lastTweet = tweets.at(0);
-    const d = new Date(Date.parse(lastTweet.created_at));
+    if (lastTweet) {
+      const d = new Date(Date.parse(lastTweet.created_at));
 
-    await this.userService.setLastSeenOfTimeline(
-      requestingUserId,
-      d.toLocaleString(),
-    );
+      await this.userService.setLastSeenOfTimeline(
+        requestingUserId,
+        d.toLocaleString(),
+      );
+    }
     return tweets;
   }
 
   async getTweetRetweets(
+    requestingUserId: number,
     tweetId: number,
     page: number,
   ): Promise<Array<UserEntity>> {
+    // Check request user can see current tweet and its target tweets
+    const acceptableCurrentTweet =
+      await this.requestingUserIsAcceptableForTargetTweet(
+        requestingUserId,
+        tweetId,
+      );
+    if (!acceptableCurrentTweet) {
+      throw new ForbiddenException('You are not allowed.');
+    }
     return await getConnection()
       .createQueryRunner()
       .manager.query(
@@ -269,44 +311,12 @@ export class TweetService {
     targetTweetType: TweetType,
   ): Promise<Array<TweetEntity>> {
     // Check request user can see current tweet and its target tweets
-    const acceptableCurrentTweet = await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT COUNT(*) FROM tweets
-                LEFT JOIN users ON 
-                    tweets.user_id = users.id
-                WHERE 
-                    tweets.id = ${tweetId} AND
-                (
-                  tweets.user_id IN (
-                        SELECT users.id FROM users
-                        LEFT JOIN follow ON
-                          users.id = follow.user_id
-                        WHERE
-                          users.id = ${requestingUserId}
-                          OR
-                          users.status = '${UserStatus.private}' AND
-                          follow.target_user_id = ${requestingUserId} AND
-                          follow.status = '${FollowStatus.follower}'
-                          OR
-                          users.status = '${UserStatus.public}' AND
-                          follow.target_user_id = ${requestingUserId} AND
-                          follow.status <> '${FollowStatus.block}'
-                    )
-                  OR
-                  tweets.user_id IN (
-                        SELECT users.id FROM users
-                        LEFT JOIN follow ON
-                          users.id = follow.target_user_id
-                        WHERE
-                          users.status = '${UserStatus.public}' AND
-                          follow.user_id = ${requestingUserId} AND
-                          follow.status <> '${FollowStatus.block}'
-                    )
-                )
-               `,
+    const acceptableCurrentTweet =
+      await this.requestingUserIsAcceptableForTargetTweet(
+        requestingUserId,
+        tweetId,
       );
-    if (acceptableCurrentTweet.at(0).count == 0) {
+    if (!acceptableCurrentTweet) {
       throw new ForbiddenException('You are not allowed.');
     }
     // Get Target tweets of
@@ -336,8 +346,13 @@ export class TweetService {
                             follow.status = '${FollowStatus.follower}'
                             OR
                             users.status = '${UserStatus.public}' AND
-                            follow.target_user_id = ${requestingUserId} AND
-                            follow.status <> '${FollowStatus.block}'
+                            (
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                              OR
+                              follow.target_user_id <> ${requestingUserId}
+                            )
+
                       )
                     OR
                     targetTweet.user_id IN (
@@ -346,8 +361,12 @@ export class TweetService {
                             users.id = follow.target_user_id
                           WHERE
                             users.status = '${UserStatus.public}' AND
+                            (
                             follow.user_id = ${requestingUserId} AND
                             follow.status <> '${FollowStatus.block}'
+                            OR
+                            follow.user_id <> ${requestingUserId}
+                          )
                       )
                   )
                 ORDER BY 
@@ -364,44 +383,12 @@ export class TweetService {
     targetTweetType: TweetType,
   ): Promise<number> {
     // Check request user can see count of current tweet and its target tweets
-    const acceptableCurrentTweet = await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT COUNT(*) FROM tweets
-                LEFT JOIN users ON 
-                    tweets.user_id = users.id
-                WHERE 
-                    tweets.id = ${tweetId} AND
-                (
-                  tweets.user_id IN (
-                        SELECT users.id FROM users
-                        LEFT JOIN follow ON
-                          users.id = follow.user_id
-                        WHERE
-                          users.id = ${requestingUserId}
-                          OR
-                          users.status = '${UserStatus.private}' AND
-                          follow.target_user_id = ${requestingUserId} AND
-                          follow.status = '${FollowStatus.follower}'
-                          OR
-                          users.status = '${UserStatus.public}' AND
-                          follow.target_user_id = ${requestingUserId} AND
-                          follow.status <> '${FollowStatus.block}'
-                    )
-                  OR
-                  tweets.user_id IN (
-                        SELECT users.id FROM users
-                        LEFT JOIN follow ON
-                          users.id = follow.target_user_id
-                        WHERE
-                          users.status = '${UserStatus.public}' AND
-                          follow.user_id = ${requestingUserId} AND
-                          follow.status <> '${FollowStatus.block}'
-                    )
-                )
-               `,
+    const acceptableCurrentTweet =
+      await this.requestingUserIsAcceptableForTargetTweet(
+        requestingUserId,
+        tweetId,
       );
-    if (acceptableCurrentTweet.at(0).count == 0) {
+    if (!acceptableCurrentTweet) {
       throw new ForbiddenException('You are not allowed.');
     }
     // Get count of target tweets of tweet
@@ -422,53 +409,112 @@ export class TweetService {
     targetUserId: number,
     page: number,
   ): Promise<Array<TweetEntity>> {
-    // Check request user can see tweets of target user or not
-    const acceptableTargetUser = await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT COUNT(*) FROM users
-                WHERE 
-                    users.id = ${targetUserId} AND
-                    (
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.user_id
-                            WHERE
-                              users.id = ${requestingUserId}
-                              OR
-                              users.status = '${UserStatus.private}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status = '${FollowStatus.follower}'
-                              OR
-                              users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                      OR
-                      users.id IN (
-                            SELECT users.id FROM users
-                            LEFT JOIN follow ON
-                              users.id = follow.target_user_id
-                            WHERE
-                              users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
-                        )
-                    )
-                `,
-      );
-    if (acceptableTargetUser.at(0).count == 0) {
-      throw new ForbiddenException(`You are not allowed.`);
-    }
-    // Return tweets of user (except replies)
     return await getConnection()
       .createQueryRunner()
       .manager.query(
         `SELECT * FROM tweets
-                WHERE
-                    user_id = ${targetUserId} AND 
-                    tweet_type <> '${TweetType.comment}'
+                WHERE 
+                    tweets.user_id = ${targetUserId} AND
+                    (
+                      (
+                        (
+                          tweets.tweet_type = '${TweetType.normal}'
+                          OR
+                          tweets.tweet_type = '${TweetType.quote}'
+                        )
+                        AND
+                        (
+                          tweets.user_id IN (
+                                SELECT users.id FROM users
+                                LEFT JOIN follow ON
+                                  users.id = follow.user_id
+                                WHERE
+                                  users.id = ${requestingUserId}
+                                  OR
+                                  users.status = '${UserStatus.private}' AND
+                                  follow.target_user_id = ${requestingUserId} AND
+                                  follow.status = '${FollowStatus.follower}'
+                                  OR
+                                  users.status = '${UserStatus.public}' AND
+                                  (
+                                    follow.target_user_id = ${requestingUserId} AND
+                                    follow.status <> '${FollowStatus.block}'
+                                    OR
+                                    follow.target_user_id <> ${requestingUserId}
+                                  )
+                            )
+                          OR
+                          tweets.user_id IN (
+                                SELECT users.id FROM users
+                                LEFT JOIN follow ON
+                                  users.id = follow.target_user_id
+                                WHERE
+                                  users.status = '${UserStatus.public}' AND
+                                  (
+                                    follow.user_id = ${requestingUserId} AND
+                                    follow.status <> '${FollowStatus.block}'
+                                    OR
+                                    follow.user_id <> ${requestingUserId}
+                                  )
+                            )
+                        )
+                      )
+                      OR
+                      (
+                        tweets.tweet_type = '${TweetType.retweet}' AND
+                        (
+                          tweets.reference_tweet_id IN (
+                                  SELECT tweets.id FROM tweets
+                                      WHERE
+                                  tweets.user_id IN (
+                                        SELECT users.id FROM users
+                                        LEFT JOIN follow ON
+                                          users.id = follow.user_id
+                                        WHERE
+                                          users.id = ${requestingUserId}
+                                          OR
+                                          users.status = '${
+                                            UserStatus.private
+                                          }' AND
+                                          follow.target_user_id = ${requestingUserId} AND
+                                          follow.status = '${
+                                            FollowStatus.follower
+                                          }'
+                                          OR
+                                          users.status = '${
+                                            UserStatus.public
+                                          }' AND
+                                          (
+                                            follow.target_user_id = ${requestingUserId} AND
+                                            follow.status <> '${
+                                              FollowStatus.block
+                                            }'
+                                            OR
+                                            follow.target_user_id <> ${requestingUserId}
+                                          )
+                                    )
+                                  OR
+                                  tweets.user_id IN (
+                                        SELECT users.id FROM users
+                                        LEFT JOIN follow ON
+                                          users.id = follow.target_user_id
+                                        WHERE
+                                          users.status = '${
+                                            UserStatus.public
+                                          }' AND
+                                          (
+                                            follow.user_id = ${requestingUserId} AND
+                                            follow.status <> '${
+                                              FollowStatus.block
+                                            }'
+                                            OR
+                                            follow.user_id <> ${requestingUserId}
+                                          )
+                                    )
+                          )
+                        )
+                      )
+                    )
                 ORDER BY 
                     tweets.created_at DESC
                 OFFSET ${page * 10} ROWS FETCH NEXT 10 ROWS ONLY
@@ -480,15 +526,14 @@ export class TweetService {
     requestingUserId: number,
     targetUserId: number,
   ): Promise<number> {
-    // Check request user can see count of tweets of target user or not
-    const acceptableTargetUser = await getConnection()
+    return await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT COUNT(*) FROM users
+        `SELECT COUNT(*) FROM tweets
                 WHERE 
-                    users.id = ${targetUserId} AND
+                    tweets.user_id = ${targetUserId} AND
                     (
-                      users.id IN (
+                      tweets.user_id IN (
                             SELECT users.id FROM users
                             LEFT JOIN follow ON
                               users.id = follow.user_id
@@ -500,29 +545,30 @@ export class TweetService {
                               follow.status = '${FollowStatus.follower}'
                               OR
                               users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
                         )
                       OR
-                      users.id IN (
+                      tweets.user_id IN (
                             SELECT users.id FROM users
                             LEFT JOIN follow ON
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                         )
                     )
                 `,
       );
-    if (acceptableTargetUser.at(0).count == 0) {
-      throw new ForbiddenException(`You are not allowed.`);
-    }
-    // Get and return count of user tweets
-    return await this.tweetRepository.count({
-      where: { userId: targetUserId },
-    });
   }
 
   async getUserReplies(
@@ -530,15 +576,16 @@ export class TweetService {
     targetUserId: number,
     page: number,
   ): Promise<Array<TweetEntity>> {
-    // Check request user can see comments of target user or not
-    const acceptableTargetUser = await getConnection()
+    // Return comments that user has tweeted
+    return await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT COUNT(*) FROM users
+        `SELECT * FROM tweets
                 WHERE 
-                    users.id = ${targetUserId} AND
+                    tweets.user_id = ${targetUserId} AND
+                    tweets.tweet_type = '${TweetType.comment}' AND
                     (
-                      users.id IN (
+                      tweets.user_id IN (
                             SELECT users.id FROM users
                             LEFT JOIN follow ON
                               users.id = follow.user_id
@@ -550,33 +597,28 @@ export class TweetService {
                               follow.status = '${FollowStatus.follower}'
                               OR
                               users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
                         )
                       OR
-                      users.id IN (
+                      tweets.user_id IN (
                             SELECT users.id FROM users
                             LEFT JOIN follow ON
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                         )
                     )
-                `,
-      );
-    if (acceptableTargetUser.at(0).count == 0) {
-      throw new ForbiddenException(`You are not allowed.`);
-    }
-    // Return comments that user has tweeted
-    return await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `SELECT * FROM tweets
-                WHERE
-                    user_id = ${targetUserId} AND 
-                    tweet_type = '${TweetType.comment}'
                 ORDER BY 
                     tweets.created_at DESC
                 OFFSET ${page * 10} ROWS FETCH NEXT 10 ROWS ONLY
@@ -588,11 +630,135 @@ export class TweetService {
     requestingUserId: number,
     targetUserId: number,
   ): Promise<number> {
-    // Check request user can see count of comments of target user or not
-    const acceptableTargetUser = await getConnection()
+    return await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT COUNT(*) FROM users
+        `SELECT COUNT(*) FROM tweets
+                WHERE 
+                    tweets.user_id = ${targetUserId} AND
+                    tweets.tweet_type = '${TweetType.comment}' AND
+                    (
+                      tweets.user_id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
+                        )
+                      OR
+                      tweets.user_id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
+                        )
+                    )
+                `,
+      );
+  }
+
+  async getUserRelationWithTweet(
+    requestingUserId: number,
+    tweetId: number,
+  ): Promise<Array<string>> {
+    const relation = await this.tweetRepository
+      .createQueryBuilder('tweets')
+      .where({
+        userId: requestingUserId,
+        referenceTweetId: tweetId,
+      })
+      .getMany();
+    const result = [];
+    for (const r of relation) {
+      result.push(r.tweetType);
+    }
+    return result.length !== 0 ? result : ['NONE'];
+  }
+
+  async create(
+    requestingUserId: number,
+    tweetDto: TweetDto,
+  ): Promise<TweetEntity> {
+    // Create tweet entity
+    const tweet = new TweetEntity();
+    tweet.text = tweetDto.text;
+    tweet.tweetType = tweetDto.tweetType;
+
+    if (tweetDto.tweetType !== TweetType.normal) {
+      // Check request user can tweet from target tweet or not
+      const acceptableCurrentTweet =
+        await this.requestingUserIsAcceptableForTargetTweet(
+          requestingUserId,
+          tweetDto.referenceTweetId,
+        );
+      if (!acceptableCurrentTweet) {
+        throw new ForbiddenException('You are not allowed.');
+      }
+      if (tweetDto.tweetType === TweetType.retweet) {
+        const thereIsRetweet = await this.tweetRepository.findOne({
+          where: {
+            tweetType: TweetType.retweet,
+            userId: requestingUserId,
+            referenceTweetId: tweetDto.referenceTweetId,
+          },
+        });
+        if (thereIsRetweet) {
+          throw new ForbiddenException('You can not retweet again');
+        }
+      }
+      // Get reference tweet
+      tweet.referenceTweetId = tweetDto.referenceTweetId;
+    }
+    tweet.userId = requestingUserId;
+    // Save tweet and return it
+    return this.tweetRepository.save(tweet);
+  }
+
+  async delete(requestingUserId: number, tweetId: number): Promise<void> {
+    // Delete tweet and retweets of tweet
+    await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `DELETE FROM tweets 
+              WHERE
+                user_id = ${requestingUserId} AND
+                (
+                  tweet_type = '${TweetType.retweet}' AND 
+                  reference_tweet_id = ${tweetId}
+                  OR
+                  id = ${tweetId}
+                )
+              `,
+      );
+  }
+
+  async requestingUserIsAcceptableForTargetUser(
+    requestingUserId: number,
+    targetUserId: number,
+  ): Promise<boolean> {
+    const thereIsAnyAcceptableRelation = await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT * FROM users
                 WHERE 
                     users.id = ${targetUserId} AND
                     (
@@ -608,8 +774,12 @@ export class TweetService {
                               follow.status = '${FollowStatus.follower}'
                               OR
                               users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
                         )
                       OR
                       users.id IN (
@@ -618,52 +788,29 @@ export class TweetService {
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                         )
                     )
                 `,
       );
-    if (acceptableTargetUser.at(0).count == 0) {
-      throw new ForbiddenException(`You are not allowed.`);
-    }
-    // Get and return count of user replies
-    return await this.tweetRepository.count({
-      where: { userId: targetUserId, tweetType: TweetType.comment },
-    });
+    return thereIsAnyAcceptableRelation.length !== 0;
   }
 
-  async getUserRelationWithTweet(
+  async requestingUserIsAcceptableForTargetTweet(
     requestingUserId: number,
-    tweetId: number,
-  ): Promise<string> {
-    const relation = await this.tweetRepository.findOne({
-      where: {
-        userId: requestingUserId,
-        referenceTweetId: tweetId,
-      },
-    });
-    return relation ? relation.tweetType : 'NONE';
-  }
-
-  async create(
-    requestingUserId: number,
-    tweetDto: TweetDto,
-  ): Promise<TweetEntity> {
-    const user = await this.userService.getUserById(requestingUserId);
-    // Create tweet entity
-    const tweet = new TweetEntity();
-    tweet.text = tweetDto.text;
-    tweet.tweetType = tweetDto.tweetType;
-
-    if (tweetDto.tweetType !== TweetType.normal) {
-      // Check request user can tweet from target tweet or not
-      const acceptableCurrentTweet = await getConnection()
-        .createQueryRunner()
-        .manager.query(
-          `SELECT COUNT(*) FROM tweets
+    targetTweetId: number,
+  ): Promise<boolean> {
+    const thereIsAnyAcceptableRelation = await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT * FROM tweets
                 WHERE
-                    tweets.id = ${tweetDto.referenceTweetId} AND
+                    tweets.id = ${targetTweetId} AND
                     (
                       tweets.user_id IN (
                             SELECT users.id FROM users
@@ -677,8 +824,12 @@ export class TweetService {
                               follow.status = '${FollowStatus.follower}'
                               OR
                               users.status = '${UserStatus.public}' AND
-                              follow.target_user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.target_user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.target_user_id <> ${requestingUserId}
+                              )
                         )
                       OR
                       tweets.user_id IN (
@@ -687,43 +838,16 @@ export class TweetService {
                               users.id = follow.target_user_id
                             WHERE
                               users.status = '${UserStatus.public}' AND
-                              follow.user_id = ${requestingUserId} AND
-                              follow.status <> '${FollowStatus.block}'
+                              (
+                                follow.user_id = ${requestingUserId} AND
+                                follow.status <> '${FollowStatus.block}'
+                                OR
+                                follow.user_id <> ${requestingUserId}
+                              )
                         )
                     )
                 `,
-        );
-      if (acceptableCurrentTweet.at(0).count == 0) {
-        throw new ForbiddenException('You are not allowed.');
-      }
-
-      // Get reference tweet
-      const referenceTweet = await this.getTweet(tweetDto.referenceTweetId);
-      tweet.referenceTweetId = tweetDto.referenceTweetId;
-      tweet.referenceTweet = referenceTweet;
-    }
-    tweet.userId = requestingUserId;
-    tweet.user = user;
-    // Save tweet and return it
-    return this.tweetRepository.save(tweet);
-  }
-
-  async delete(requestingUserId: number, tweetId: number): Promise<void> {
-    const tweet = await this.getTweet(tweetId);
-    // Check ownership of tweet
-    if (requestingUserId !== tweet.userId) {
-      throw new ForbiddenException('You are not allowed.');
-    }
-    // Delete tweet and retweets of tweet
-    await getConnection()
-      .createQueryRunner()
-      .manager.query(
-        `DELETE FROM tweets 
-              WHERE 
-                  tweet_type = '${TweetType.retweet}' AND 
-                  reference_tweet_id = ${tweetId}
-                  OR
-                  id = ${tweetId}`,
       );
+    return thereIsAnyAcceptableRelation.length !== 0;
   }
 }
