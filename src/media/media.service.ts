@@ -12,6 +12,7 @@ import { FollowService } from '../follow/follow.service';
 import { MediaDto } from './dtos/media.dto';
 import { TweetService } from '../tweet/tweet.service';
 import { Status as FollowStatus } from '../follow/entities/follow.entity';
+import { TweetEntity } from '../tweet/entities/tweet.entity';
 
 @Injectable()
 export class MediaService {
@@ -22,6 +23,141 @@ export class MediaService {
     private readonly followService: FollowService,
     private readonly tweetService: TweetService,
   ) {}
+
+  async getProfileMedias(userId: number): Promise<Array<MediaEntity>> {
+    return await this.mediaRepository.find({
+      where: [
+        {
+          userId: userId,
+          mediaPosition: MediaPosition.avatar,
+        },
+        {
+          userId: userId,
+          mediaPosition: MediaPosition.profileImg,
+        },
+      ],
+    });
+  }
+
+  async getTweetMedias(
+    requestingUserId: number,
+    tweetId: number,
+  ): Promise<Array<MediaEntity>> {
+    // Check request user can see comments of target user or not
+    const acceptableTargetUser = await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT COUNT(*) FROM users
+                LEFT JOIN media ON
+                    users.id = media.user_id
+                WHERE 
+                    media.tweet_id = ${tweetId} AND
+                    (
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                    )
+                `,
+      );
+    if (acceptableTargetUser.at(0).count == 0) {
+      throw new ForbiddenException(`You are not allowed.`);
+    }
+    // Return tweet medias metadata
+    return await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT * FROM media
+                WHERE
+                    media_position = '${MediaPosition.tweetMedia}' AND
+                    tweet_id = ${tweetId}
+                ORDER BY media.created_at ASC
+                `,
+      );
+  }
+
+  async getUserMedias(
+    requestingUserId: number,
+    targetUserId: number,
+    page: number,
+  ): Promise<Array<TweetEntity>> {
+    // Check request user can see comments of target user or not
+    const acceptableTargetUser = await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT COUNT(*) FROM users
+                WHERE 
+                    users.id = ${targetUserId} AND
+                    (
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                    )
+                `,
+      );
+    if (acceptableTargetUser.at(0).count == 0) {
+      throw new ForbiddenException(`You are not allowed.`);
+    }
+    // Return tweets of user that have media
+    return await getConnection()
+      .createQueryRunner()
+      .manager.query(
+        `SELECT tweets.id, text, tweet_type, reference_tweet_id, tweets.user_id FROM tweets
+                LEFT JOIN media ON
+                    tweets.id = media.tweet_id
+                WHERE
+                    media_position = '${MediaPosition.tweetMedia}' AND
+                    tweets.user_id = ${targetUserId}
+                GROUP BY tweets.id
+                ORDER BY tweets.created_at DESC
+                OFFSET ${page * 10} ROWS FETCH NEXT 10 ROWS ONLY
+                `,
+      );
+  }
+
   async getUserMediasCount(
     requestingUserId: number,
     targetUserId: number,
@@ -30,40 +166,43 @@ export class MediaService {
     const acceptableTargetUser = await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT * FROM users
+        `SELECT COUNT(*) FROM users
                 WHERE 
                     users.id = ${targetUserId} AND
-                (
-                    users.id = ${requestingUserId}
-                OR
-                    users.status = '${UserStatus.public}' AND
                     (
-                    users.id NOT IN (SELECT user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          target_user_id = ${requestingUserId}
-                                    )
-                    OR
-                    users.id NOT IN (SELECT target_user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          user_id = ${requestingUserId}
-                                    )                    
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
                     )
-                OR
-                    users.status = '${UserStatus.private}' AND
-                    users.id IN (SELECT user_id FROM follow
-                                 WHERE
-                                    status = '${FollowStatus.follower}' AND
-                                    target_user_id = ${requestingUserId}
-                                )
-                )`,
+                `,
       );
-    if (acceptableTargetUser.length === 0) {
+    if (acceptableTargetUser.at(0).count == 0) {
       throw new ForbiddenException(`You are not allowed.`);
     }
     // Return count of tweets of user that have media
-    return await getConnection()
+    const count = await getConnection()
       .createQueryRunner()
       .manager.query(
         `SELECT COUNT(*)
@@ -73,6 +212,7 @@ export class MediaService {
                     user_id = ${targetUserId}
                 GROUP BY tweet_id`,
       );
+    return count.at(0).count;
   }
 
   async uploadMedia(
@@ -111,18 +251,43 @@ export class MediaService {
     }
     // If media is being for a tweet, must check its owner is private or public
     if (mediaMetadata.mediaPosition === MediaPosition.tweetMedia) {
-      const mediaOwner = await this.userService.getUserById(
-        mediaMetadata.userId,
-      );
-      if (mediaOwner.status === UserStatus.private) {
-        // Check requesting user is follower of owner media or not
-        const followRelation = await this.followService.isFollower(
-          requestingUserId,
-          mediaOwner.id,
+      const acceptableTargetUser = await getConnection()
+        .createQueryRunner()
+        .manager.query(
+          `SELECT COUNT(*) FROM users
+                WHERE 
+                    users.id = ${mediaMetadata.userId} AND
+                    (
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                    )
+                `,
         );
-        if (!followRelation) {
-          throw new ForbiddenException('You are not allowed.');
-        }
+      if (acceptableTargetUser.at(0).count == 0) {
+        throw new ForbiddenException(`You are not allowed.`);
       }
     }
     return mediaMetadata;

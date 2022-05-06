@@ -68,10 +68,9 @@ export class UserEntity {
   authInfo: AuthEntity;
 
   @OneToMany(() => MediaEntity, (mediaEntity) => mediaEntity.user, {
-    eager: true,
     cascade: true,
   })
-  profileMedias: Promise<Array<MediaEntity>>;
+  medias: Promise<Array<MediaEntity>>;
 
   // user in followers / followings / pending users / blocked users list of other
   @OneToMany(() => FollowEntity, (followEntity) => followEntity.targetUser, {

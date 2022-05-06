@@ -4,10 +4,9 @@ import { TweetController } from './tweet.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TweetEntity } from './entities/tweet.entity';
 import { UserModule } from '../user/user.module';
-import { FollowModule } from '../follow/follow.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TweetEntity]), UserModule, FollowModule],
+  imports: [TypeOrmModule.forFeature([TweetEntity]), UserModule],
   providers: [TweetService],
   controllers: [TweetController],
   exports: [TweetService],

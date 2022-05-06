@@ -5,6 +5,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Response,
   StreamableFile,
   UploadedFile,
@@ -19,14 +20,46 @@ import { UserEntity } from '../user/entities/user.entity';
 import { createReadStream, unlink } from 'fs';
 import { join } from 'path';
 import { Express } from 'express';
-import { MediaPosition } from './entities/media.entity';
+import { MediaEntity, MediaPosition } from './entities/media.entity';
 import { MediaDto } from './dtos/media.dto';
 import MediaInterceptor from './media.interceptor';
+import { TweetEntity } from '../tweet/entities/tweet.entity';
 
 @ApiTags('Media management')
 @Controller('media')
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
+
+  @Get('/:userId/profileMedias')
+  @ApiOperation({ summary: 'Get metadata of avatar and profileImg.' })
+  getProfileMedias(
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<Array<MediaEntity>> {
+    return this.mediaService.getProfileMedias(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('/:tweetId/tweetMedias')
+  @ApiOperation({ summary: 'Get metadata of tweet.' })
+  getTweetMedias(
+    @Param('tweetId', ParseIntPipe) tweetId: number,
+    @GetCurrentUser() requestingUser: UserEntity,
+  ): Promise<Array<MediaEntity>> {
+    return this.mediaService.getTweetMedias(requestingUser.id, tweetId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('/:userId/medias')
+  @ApiOperation({
+    summary: 'Get user tweets including media. (by id)',
+  })
+  getUserMedias(
+    @GetCurrentUser() requestingUser: UserEntity,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('page') page = '0',
+  ): Promise<Array<TweetEntity>> {
+    return this.mediaService.getUserMedias(requestingUser.id, userId, +page);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('/:userId/mediasCount')

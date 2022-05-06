@@ -53,59 +53,14 @@ export class FollowService {
       },
     });
 
-    // followFollow
+    // noneNone
     if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
-      // Relation target user to requesting user: follower
-      targetToRequesting.status === Status.follower
-    ) {
-      return RelationStatus.followFollow;
-    }
-    // followPending
-    else if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
-      // Relation target user to requesting user: pending
-      targetToRequesting.status === Status.pending
-    ) {
-      return RelationStatus.followPending;
-    }
-    // followNone
-    else if (
-      // Relation requesting user to target user: follower
-      requestingToTarget.status === Status.follower &&
+      // Relation requesting user to target user: none
+      !requestingToTarget &&
       // Relation target user to requesting user: none
       !targetToRequesting
     ) {
-      return RelationStatus.followNone;
-    }
-    // pendingFollow
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: follow
-      targetToRequesting.status === Status.follower
-    ) {
-      return RelationStatus.pendingFollow;
-    }
-    // pendingPending
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: pending
-      targetToRequesting.status === Status.pending
-    ) {
-      return RelationStatus.pendingPending;
-    }
-    // pendingNone
-    else if (
-      // Relation requesting user to target user: pending
-      requestingToTarget.status === Status.pending &&
-      // Relation target user to requesting user: none
-      !targetToRequesting
-    ) {
-      return RelationStatus.pendingNone;
+      return RelationStatus.noneNone;
     }
     // noneFollow
     else if (
@@ -116,6 +71,15 @@ export class FollowService {
     ) {
       return RelationStatus.noneFollow;
     }
+    // followNone
+    else if (
+      // Relation requesting user to target user: follower
+      requestingToTarget.status === Status.follower &&
+      // Relation target user to requesting user: none
+      !targetToRequesting
+    ) {
+      return RelationStatus.followNone;
+    }
     // nonePending
     else if (
       // Relation requesting user to target user: none
@@ -125,23 +89,14 @@ export class FollowService {
     ) {
       return RelationStatus.nonePending;
     }
-    // noneNone
+    // pendingNone
     else if (
-      // Relation requesting user to target user: none
-      !requestingToTarget &&
+      // Relation requesting user to target user: pending
+      requestingToTarget.status === Status.pending &&
       // Relation target user to requesting user: none
       !targetToRequesting
     ) {
-      return RelationStatus.noneNone;
-    }
-    // blockBlock
-    else if (
-      // Relation requesting user to target user: block
-      targetToRequesting.status === Status.block &&
-      // Relation target user to requesting user: block
-      requestingToTarget.status === Status.block
-    ) {
-      return RelationStatus.blockBlock;
+      return RelationStatus.pendingNone;
     }
     // blockNone
     else if (
@@ -161,6 +116,51 @@ export class FollowService {
     ) {
       return RelationStatus.noneBlock;
     }
+    // followFollow
+    else if (
+      // Relation requesting user to target user: follower
+      requestingToTarget.status === Status.follower &&
+      // Relation target user to requesting user: follower
+      targetToRequesting.status === Status.follower
+    ) {
+      return RelationStatus.followFollow;
+    }
+    // followPending
+    else if (
+      // Relation requesting user to target user: follower
+      requestingToTarget.status === Status.follower &&
+      // Relation target user to requesting user: pending
+      targetToRequesting.status === Status.pending
+    ) {
+      return RelationStatus.followPending;
+    }
+    // pendingFollow
+    else if (
+      // Relation requesting user to target user: pending
+      requestingToTarget.status === Status.pending &&
+      // Relation target user to requesting user: follow
+      targetToRequesting.status === Status.follower
+    ) {
+      return RelationStatus.pendingFollow;
+    }
+    // pendingPending
+    else if (
+      // Relation requesting user to target user: pending
+      requestingToTarget.status === Status.pending &&
+      // Relation target user to requesting user: pending
+      targetToRequesting.status === Status.pending
+    ) {
+      return RelationStatus.pendingPending;
+    }
+    // blockBlock
+    else if (
+      // Relation requesting user to target user: block
+      targetToRequesting.status === Status.block &&
+      // Relation target user to requesting user: block
+      requestingToTarget.status === Status.block
+    ) {
+      return RelationStatus.blockBlock;
+    }
   }
 
   async getUserFollowers(
@@ -172,42 +172,45 @@ export class FollowService {
     const acceptableTargetUser = await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT * FROM users
+        `SELECT COUNT(*) FROM users
                 WHERE 
                     users.id = ${targetUserId} AND
-                (
-                    users.id = ${requestingUserId}
-                OR
-                    users.status = '${UserStatus.public}' AND
                     (
-                    users.id NOT IN (SELECT user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          target_user_id = ${requestingUserId}
-                                    )
-                    OR
-                    users.id NOT IN (SELECT target_user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          user_id = ${requestingUserId}
-                                    )                    
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
                     )
-                OR
-                    users.status = '${UserStatus.private}' AND
-                    users.id IN (SELECT user_id FROM follow
-                                 WHERE
-                                    status = '${FollowStatus.follower}' AND
-                                    target_user_id = ${requestingUserId}
-                                )
-                )`,
+                `,
       );
-    if (acceptableTargetUser.length === 0) {
+    if (acceptableTargetUser.at(0).count == 0) {
       throw new ForbiddenException(`You are not allowed.`);
     }
     return getConnection()
       .createQueryRunner()
       .query(
-        `SELECT target_user_id, username, name, bio FROM users 
+        `SELECT users.id, username, name, bio FROM users 
                 INNER JOIN follow ON 
                     users.id = follow.target_user_id 
                 WHERE 
@@ -228,36 +231,39 @@ export class FollowService {
     const acceptableTargetUser = await getConnection()
       .createQueryRunner()
       .manager.query(
-        `SELECT * FROM users
+        `SELECT COUNT(*) FROM users
                 WHERE 
                     users.id = ${targetUserId} AND
-                (
-                    users.id = ${requestingUserId}
-                OR
-                    users.status = '${UserStatus.public}' AND
                     (
-                    users.id NOT IN (SELECT user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          target_user_id = ${requestingUserId}
-                                    )
-                    OR
-                    users.id NOT IN (SELECT target_user_id FROM follow
-                                      WHERE 
-                                          status = '${FollowStatus.block}' AND
-                                          user_id = ${requestingUserId}
-                                    )                    
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.user_id
+                            WHERE
+                              users.id = ${requestingUserId}
+                              OR
+                              users.status = '${UserStatus.private}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status = '${FollowStatus.follower}'
+                              OR
+                              users.status = '${UserStatus.public}' AND
+                              follow.target_user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
+                      OR
+                      users.id IN (
+                            SELECT users.id FROM users
+                            LEFT JOIN follow ON
+                              users.id = follow.target_user_id
+                            WHERE
+                              users.status = '${UserStatus.public}' AND
+                              follow.user_id = ${requestingUserId} AND
+                              follow.status <> '${FollowStatus.block}'
+                        )
                     )
-                OR
-                    users.status = '${UserStatus.private}' AND
-                    users.id IN (SELECT user_id FROM follow
-                                 WHERE
-                                    status = '${FollowStatus.follower}' AND
-                                    target_user_id = ${requestingUserId}
-                                )
-                )`,
+                `,
       );
-    if (acceptableTargetUser.length === 0) {
+    if (acceptableTargetUser.at(0).count == 0) {
       throw new ForbiddenException(`You are not allowed.`);
     }
     return getConnection()
@@ -470,22 +476,18 @@ export class FollowService {
       .createQueryRunner()
       .manager.query(
         `DELETE FROM follow WHERE 
-                    // If requesting user be follower of target user
                     status = '${FollowStatus.follower}' AND 
                     target_user_id = ${requestingUserId} AND 
                     user_id = ${targetUserId} 
                OR 
-                    // If requesting user be pending to target user
                     status = '${FollowStatus.pending}' AND 
                     target_user_id = ${requestingUserId} AND 
                     user_id = ${targetUserId} 
                OR 
-                    // If target user be follower of requesting user
                     status = '${FollowStatus.follower}' AND 
                     target_user_id = ${targetUserId} AND 
                     user_id = ${requestingUserId} 
                OR 
-                    // If target user be follower to requesting user
                     status = '${FollowStatus.pending}' AND 
                     target_user_id = ${targetUserId} AND 
                     user_id = ${requestingUserId}`,
@@ -515,16 +517,5 @@ export class FollowService {
     }
     // Delete relation
     await this.followRepository.remove(blockRelation);
-  }
-
-  async isFollower(followerId: number, followingId: number): Promise<boolean> {
-    const followRelation = await this.followRepository.findOne({
-      where: {
-        status: FollowStatus.follower,
-        userId: followingId,
-        targetUserId: followerId,
-      },
-    });
-    return !!followRelation;
   }
 }

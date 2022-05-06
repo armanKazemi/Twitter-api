@@ -1,8 +1,11 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
+  Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { LikeService } from './like.service';
@@ -26,16 +29,15 @@ export class LikeController {
     return this.likeService.getLikeById(likeId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/:targetTweetId/tweetLikes')
   @ApiOperation({
     summary: 'Get users that have liked  the tweet. (by id)',
   })
   getTweetLikes(
+    @Query('page') page = '0',
     @Param('targetTweetId', ParseIntPipe) targetTweetId: number,
-    @GetCurrentUser() requestingUser: UserEntity,
   ): Promise<Array<UserEntity>> {
-    return this.likeService.getTweetLikes(requestingUser.id, targetTweetId);
+    return this.likeService.getTweetLikes(targetTweetId, +page);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -59,10 +61,15 @@ export class LikeController {
     summary: 'Get tweets that user has liked. (by id)',
   })
   getUserLikes(
+    @Query('page') page = '0',
     @Param('targetUserId', ParseIntPipe) targetUserId: number,
     @GetCurrentUser() requestingUser: UserEntity,
   ): Promise<Array<TweetEntity>> {
-    return this.likeService.getUserLikes(requestingUser.id, targetUserId);
+    return this.likeService.getUserLikes(
+      requestingUser.id,
+      targetUserId,
+      +page,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -78,7 +85,17 @@ export class LikeController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('/:targetTweetId/like')
+  @Get('/:tweetId/hasLiked')
+  @ApiOperation({ summary: 'If user has liked the tweet?' })
+  hasLiked(
+    @Param('tweetId', ParseIntPipe) tweetId: number,
+    @GetCurrentUser() requestingUser: UserEntity,
+  ): Promise<boolean> {
+    return this.likeService.hasLiked(requestingUser.id, tweetId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('/:targetTweetId')
   @ApiOperation({
     summary: 'Like tweet.',
   })
@@ -90,7 +107,7 @@ export class LikeController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('/:targetTweetId/unlike')
+  @Delete('/:targetTweetId')
   @ApiOperation({
     summary: 'Unlike tweet.',
   })

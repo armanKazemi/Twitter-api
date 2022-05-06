@@ -14,7 +14,6 @@ import { UserEntity } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserDto } from './dtos/user.dto';
 import { GetCurrentUser } from './decorator/getCurrentUser.decorator';
-import { LastSeenOfTimelineDto } from './dtos/lastSeenOfTimeline.dto';
 
 @ApiTags('User Management')
 @Controller('user')
@@ -62,18 +61,15 @@ export class UserController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('/timelinePage')
+  @Get('/timelinePage/:a')
   @ApiOperation({
     summary:
       'Get last page (pagination) that user seen his tweets in timeline.',
   })
   getTimelinePageBaseLastSeen(
+    @Param('a') a = '0',
     @GetCurrentUser() user: UserEntity,
-    @Body() lastSeenOfTimelineDto: LastSeenOfTimelineDto,
   ): Promise<number> {
-    return this.userService.getTimelinePageBaseLastSeen(
-      user.id,
-      lastSeenOfTimelineDto.lastSeen,
-    );
+    return this.userService.getTimelinePageBaseLastSeen(user.id);
   }
 }

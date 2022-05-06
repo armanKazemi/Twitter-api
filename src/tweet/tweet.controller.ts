@@ -17,13 +17,13 @@ import { UserEntity } from '../user/entities/user.entity';
 import { TweetEntity, TweetType } from './entities/tweet.entity';
 import { TweetDto } from './dtos/tweet.dto';
 
-@UseGuards(JwtAuthGuard)
 @ApiTags('Tweet management')
 @Controller('tweet')
 export class TweetController {
   constructor(private readonly tweetService: TweetService) {}
 
   // TWEETS
+  @UseGuards(JwtAuthGuard)
   @Get('/:tweetId')
   @ApiOperation({ summary: 'Get tweet by id.' })
   getTweetById(
@@ -33,16 +33,19 @@ export class TweetController {
     return this.tweetService.getTweetById(requestingUser.id, tweetId);
   }
 
-  @Get('/timeline')
+  @UseGuards(JwtAuthGuard)
+  @Get('/timeline/:page')
   @ApiOperation({ summary: 'Get timeline tweets.' })
   getTimelineTweets(
-    @Query('page') page = '0',
+    // @Query('page') page = '0',
+    @Param('page') page = '0',
     @GetCurrentUser() user: UserEntity,
   ): Promise<Array<TweetEntity>> {
     return this.tweetService.getTimelineTweets(user.id, +page);
   }
 
   // COMMENTS
+  @UseGuards(JwtAuthGuard)
   @Get(':tweetId/comments')
   @ApiOperation({ summary: 'Get comments of tweet. (by id)' })
   getTweetComments(
@@ -58,6 +61,7 @@ export class TweetController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/:tweetId/commentsCount')
   @ApiOperation({
     summary: `Get count of tweet's comments. (by id)`,
@@ -79,15 +83,11 @@ export class TweetController {
   getTweetRetweets(
     @Query('page') page = '0',
     @Param('tweetId', ParseIntPipe) tweetId: number,
-    @GetCurrentUser() requestingUser: UserEntity,
   ): Promise<Array<UserEntity>> {
-    return this.tweetService.getTweetRetweets(
-      requestingUser.id,
-      tweetId,
-      +page,
-    );
+    return this.tweetService.getTweetRetweets(tweetId, +page);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/:tweetId/retweetsCount')
   @ApiOperation({
     summary: `Get count of tweet's retweets. (by id)`,
@@ -104,6 +104,7 @@ export class TweetController {
   }
 
   // QUOTES
+  @UseGuards(JwtAuthGuard)
   @Get(':tweetId/quotes')
   @ApiOperation({ summary: 'Get quotes of tweet. (by id)' })
   getTweetQuotes(
@@ -119,6 +120,7 @@ export class TweetController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/:tweetId/quotesCount')
   @ApiOperation({
     summary: `Get count of tweet's quotes. (by id)`,
@@ -135,6 +137,7 @@ export class TweetController {
   }
 
   // USER TWEETS
+  @UseGuards(JwtAuthGuard)
   @Get(':targetUserId/tweets')
   @ApiOperation({ summary: 'Get tweets of target user. (by id)' })
   getUserTweets(
@@ -149,6 +152,7 @@ export class TweetController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/:targetUserId/tweetsCount')
   @ApiOperation({
     summary: 'Get count of tweets that user created. (by id)',
@@ -164,6 +168,7 @@ export class TweetController {
   }
 
   // USER REPLIES
+  @UseGuards(JwtAuthGuard)
   @Get(':targetUserId/replies')
   @ApiOperation({
     summary: 'Get comments that target user has posted. (by id)',
@@ -180,6 +185,7 @@ export class TweetController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/:targetUserId/repliesCount')
   @ApiOperation({
     summary: 'Get count of comments that user has posted. (by id)',
@@ -194,6 +200,20 @@ export class TweetController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('/:tweetId/userRelationTweet')
+  @ApiOperation({ summary: 'Get relation of user and tweet.' })
+  getUserRelationWithTweet(
+    @Param('tweetId', ParseIntPipe) tweetId: number,
+    @GetCurrentUser() requestingUser: UserEntity,
+  ): Promise<string> {
+    return this.tweetService.getUserRelationWithTweet(
+      requestingUser.id,
+      tweetId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('/')
   @ApiOperation({ summary: 'Create new tweet.' })
   create(
@@ -203,6 +223,7 @@ export class TweetController {
     return this.tweetService.create(user.id, tweetDto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete('/:tweetId')
   @ApiOperation({ summary: 'Delete tweet. (by id)' })
   delete(

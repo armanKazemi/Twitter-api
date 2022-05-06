@@ -46,7 +46,7 @@ export class MediaEntity {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne(() => UserEntity, (userEntity) => userEntity.profileMedias, {
+  @ManyToOne(() => UserEntity, (userEntity) => userEntity.medias, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
